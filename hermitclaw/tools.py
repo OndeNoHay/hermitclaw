@@ -171,17 +171,16 @@ def _is_safe_command(command: str) -> str | None:
     return None
 
 
-def _rewrite_python_cmd(command: str, env_root: str) -> str | None:
+def _rewrite_python_cmd(command: str, env_root: str) -> list[str] | None:
     """If command is a python invocation, rewrite to run through the sandbox.
 
-    Uses the crab's venv python so installed packages are available.
-    Returns the rewritten command, or None if it's not a python command.
+    Returns a list of args for direct subprocess execution (no shell, no quoting issues).
     """
     stripped = command.strip()
     if stripped.startswith("python3"):
-        rest = stripped[7:]
+        bare = stripped[7:]
     elif stripped.startswith("python"):
-        rest = stripped[6:]
+        bare = stripped[6:]
     else:
         return None
     real_root = os.path.realpath(env_root)
@@ -190,40 +189,52 @@ def _rewrite_python_cmd(command: str, env_root: str) -> str | None:
         if os.path.isfile(_venv_python(env_root))
         else sys.executable
     )
-    return (
-        f"{shlex.quote(python)} {shlex.quote(_SANDBOX)} {shlex.quote(real_root)}{rest}"
-    )
+    try:
+        rest_args = shlex.split(bare.strip())
+    except ValueError:
+        rest_args = bare.strip().split()
+    return [python, _SANDBOX, real_root] + rest_args
 
 
-def _rewrite_script_cmd(command: str, env_root: str) -> str | None:
+def _rewrite_script_cmd(command: str, env_root: str) -> list[str] | None:
     """Route ./script.py (or .\\script.py on Windows) through sandbox so network etc. is blocked."""
     stripped = command.strip()
-    # Accept both Unix (./) and Windows (.\) relative script invocations
     if stripped.startswith("./") or (sys.platform == "win32" and stripped.startswith(".\\")):
         prefix_len = 2  # both "./" and ".\\" are 2 characters
-        script = stripped[prefix_len:].split()[0]  # foo.py or foo.py arg1
-        rest = stripped[prefix_len + len(script) :].strip()  # any args after script
+        try:
+            parts = shlex.split(stripped[prefix_len:])
+            script, rest_args = parts[0], parts[1:]
+        except ValueError:
+            script = stripped[prefix_len:].split()[0]
+            rest_args = stripped[prefix_len + len(script):].strip().split()
         python = (
             _venv_python(env_root)
             if os.path.isfile(_venv_python(env_root))
             else sys.executable
         )
         real_root = os.path.realpath(env_root)
-        return f"{shlex.quote(python)} {shlex.quote(_SANDBOX)} {shlex.quote(real_root)} {shlex.quote(script)}{' ' + rest if rest else ''}"
+        return [python, _SANDBOX, real_root, script] + rest_args
     return None
 
 
-def _rewrite_pip_cmd(command: str, env_root: str) -> str | None:
-    """If command is pip/uv pip, rewrite to use the venv. Returns rewritten cmd or None."""
+def _rewrite_pip_cmd(command: str, env_root: str) -> list[str] | None:
+    """If command is pip/uv pip, rewrite to use the venv. Returns arg list or None."""
     stripped = command.strip()
     if stripped.startswith("uv pip "):
-        # Route through venv python
         rest = stripped[7:]  # after "uv pip "
         uv = shutil.which("uv") or "uv"
-        return f"{shlex.quote(uv)} pip {rest} --python {shlex.quote(_venv_python(env_root))}"
+        try:
+            rest_args = shlex.split(rest)
+        except ValueError:
+            rest_args = rest.split()
+        return [uv, "pip"] + rest_args + ["--python", _venv_python(env_root)]
     if stripped.startswith("pip install") or stripped.startswith("pip3 install"):
-        # Use venv pip
-        return f"{shlex.quote(_venv_python(env_root))} -m pip {stripped[stripped.index('install'):]}"
+        install_rest = stripped[stripped.index("install"):]
+        try:
+            install_args = shlex.split(install_rest)
+        except ValueError:
+            install_args = install_rest.split()
+        return [_venv_python(env_root), "-m", "pip"] + install_args
     return None
 
 
@@ -236,19 +247,14 @@ def run_command(command: str, env_root: str) -> str:
     if err:
         return err
 
-    # Route python commands through the sandbox wrapper
-    rewritten = _rewrite_python_cmd(command, env_root)
-    if rewritten is not None:
-        command = rewritten
-
-    # Route ./script.py through sandbox (otherwise shebang bypasses pysandbox)
-    script_rewritten = _rewrite_script_cmd(command, env_root)
-    if script_rewritten is not None:
-        command = script_rewritten
-    # Route pip/uv pip through the venv
-    pip_rewritten = _rewrite_pip_cmd(command, env_root)
-    if pip_rewritten is not None:
-        command = pip_rewritten
+    # Route python/script/pip commands through the sandbox wrapper.
+    # These return a list[str] so the code is passed as a clean subprocess arg,
+    # completely bypassing shell quoting — fixes f-string/double-quote mangling.
+    cmd_list = (
+        _rewrite_python_cmd(command, env_root)
+        or _rewrite_script_cmd(command, env_root)
+        or _rewrite_pip_cmd(command, env_root)
+    )
 
     # Include venv bin in PATH so installed tools are available
     vbin = _venv_bin(env_root)
@@ -271,29 +277,27 @@ def run_command(command: str, env_root: str) -> str:
     }
 
     try:
-        if sys.platform == "win32":
-            # Rewritten Python/pip commands start with a shlex-quoted executable path.
-            # Run them directly as a list to avoid any shell quoting issues — this works
-            # regardless of which shell (pwsh/powershell/cmd) is available.
-            if command.lstrip().startswith(("'", '"')):
-                result = subprocess.run(
-                    shlex.split(command),
-                    cwd=real_root,
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                    env=run_env,
-                )
-            else:
-                # Plain shell commands: use best available shell (pwsh > powershell > cmd).
-                result = subprocess.run(
-                    _WIN_SHELL + [command],
-                    cwd=real_root,
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                    env=run_env,
-                )
+        if cmd_list is not None:
+            # Python/script/pip: run directly, no shell at all (on any platform).
+            # This ensures code strings with quotes, f-strings, etc. are never mangled.
+            result = subprocess.run(
+                cmd_list,
+                cwd=real_root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=run_env,
+            )
+        elif sys.platform == "win32":
+            # Plain shell commands: use best available shell (pwsh > powershell > cmd).
+            result = subprocess.run(
+                _WIN_SHELL + [command],
+                cwd=real_root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=run_env,
+            )
         else:
             result = subprocess.run(
                 command,

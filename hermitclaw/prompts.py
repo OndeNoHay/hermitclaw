@@ -6,10 +6,10 @@ from datetime import datetime
 
 if sys.platform == "win32":
     _SHELL_COMMANDS_HINT = (
-        "**Shell commands** (PowerShell) in your environment folder — "
-        "ls, cat, mkdir, mv, cp, echo work as aliases. "
+        "**Shell commands** in your environment folder — "
+        "use `dir` to list files, `type filename` to read a file, `mkdir dirname` to create folders. "
         "To write files use Python: `python -c \"open('file.txt', 'w').write('content')\"`. "
-        "For text search use Python instead of grep."
+        "To search text use Python instead of grep."
     )
 else:
     _SHELL_COMMANDS_HINT = (

@@ -34,12 +34,13 @@ def _log_error_response(response: httpx.Response) -> None:
 
 if sys.platform == "win32":
     _SHELL_DESCRIPTION = (
-        "Run a PowerShell command inside your environment folder. "
-        "ls, cat, mkdir, mv, cp, echo work (PowerShell aliases). "
+        "Run a shell command inside your environment folder. "
+        "Use: dir (list files), type filename (read file), mkdir dirname (create folder), "
+        "copy src dst (copy), move src dst (move), del filename (delete). "
         "To write files use Python: python -c \"open('file.txt', 'w').write('your content')\". "
         "To search text use Python: python -c \"[print(l) for l in open('f.txt') if 'term' in l]\". "
-        "You can also run Python scripts: 'python script.py' or 'python -c \"code\"'. "
-        "Create folders with mkdir. All paths are relative to your environment root."
+        "You can also run Python scripts: python script.py or python -c \"code\". "
+        "All paths are relative to your environment root."
     )
 else:
     _SHELL_DESCRIPTION = (

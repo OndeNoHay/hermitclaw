@@ -16,6 +16,19 @@ from hermitclaw.config import config
 
 logger = logging.getLogger("hermitclaw.tools")
 
+# Detect best available shell on Windows once at module load.
+# Rewritten Python/pip commands are always run directly (no shell), so this is only
+# used for plain shell commands (ls/dir, cat/type, mkdir, etc.).
+if sys.platform == "win32":
+    if shutil.which("pwsh"):
+        _WIN_SHELL = ["pwsh", "-NoProfile", "-NonInteractive", "-Command"]
+    elif shutil.which("powershell"):
+        _WIN_SHELL = ["powershell", "-NoProfile", "-NonInteractive", "-Command"]
+    else:
+        _WIN_SHELL = ["cmd", "/c"]
+else:
+    _WIN_SHELL = []  # unused on non-Windows
+
 OLLAMA_WEB_SEARCH_URL = "https://ollama.com/api/web_search"
 OLLAMA_WEB_FETCH_URL = "https://ollama.com/api/web_fetch"
 
@@ -259,18 +272,28 @@ def run_command(command: str, env_root: str) -> str:
 
     try:
         if sys.platform == "win32":
-            # cmd.exe doesn't have ls, cat, grep, etc. — use PowerShell instead.
-            # Rewritten Python/pip commands start with a quoted path; prefix & to invoke them.
+            # Rewritten Python/pip commands start with a shlex-quoted executable path.
+            # Run them directly as a list to avoid any shell quoting issues — this works
+            # regardless of which shell (pwsh/powershell/cmd) is available.
             if command.lstrip().startswith(("'", '"')):
-                command = "& " + command
-            result = subprocess.run(
-                ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
-                cwd=real_root,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                env=run_env,
-            )
+                result = subprocess.run(
+                    shlex.split(command),
+                    cwd=real_root,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    env=run_env,
+                )
+            else:
+                # Plain shell commands: use best available shell (pwsh > powershell > cmd).
+                result = subprocess.run(
+                    _WIN_SHELL + [command],
+                    cwd=real_root,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    env=run_env,
+                )
         else:
             result = subprocess.run(
                 command,

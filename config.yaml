@@ -2,7 +2,12 @@
 provider: "custom"              # "openai" | "openrouter" | "custom"
 model: "qwen3:8b"
 api_key: null                   # set here or via OPENAI_API_KEY / OPENROUTER_API_KEY env var
+<<<<<<< HEAD
 base_url: "http://localhost:11434/v1"                 # auto-set for known providers; required for "custom"
+=======
+base_url: null                  # auto-set for known providers; required for "custom"
+                                # for Ollama: http://localhost:11434  (or with /v1, both work)
+>>>>>>> 04114eaf4764085341714098c3bf27987e21e626
 ollama_api_key: null            # for Ollama cloud web search (minimax:cloud etc.) — OLLAMA_API_KEY env
 
 thinking_pace_seconds: 5       # how often it thinks (steady pulse)

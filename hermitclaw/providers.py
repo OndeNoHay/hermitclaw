@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import sys
 
 import httpx
 import openai
@@ -31,18 +32,30 @@ def _log_error_response(response: httpx.Response) -> None:
         )
 
 
+if sys.platform == "win32":
+    _SHELL_DESCRIPTION = (
+        "Run a PowerShell command inside your environment folder. "
+        "ls, cat, mkdir, mv, cp, echo work (PowerShell aliases). "
+        "To write files use Python: python -c \"open('file.txt', 'w').write('your content')\". "
+        "To search text use Python: python -c \"[print(l) for l in open('f.txt') if 'term' in l]\". "
+        "You can also run Python scripts: 'python script.py' or 'python -c \"code\"'. "
+        "Create folders with mkdir. All paths are relative to your environment root."
+    )
+else:
+    _SHELL_DESCRIPTION = (
+        "Run a shell command inside your environment folder. "
+        "You can use ls, cat, mkdir, mv, cp, touch, echo, tee, find, grep, head, tail, wc, etc. "
+        "You can also run Python scripts: 'python script.py' or 'python -c \"code\"'. "
+        "Use 'cat > file.txt << EOF' or 'echo ... > file.txt' to write files. "
+        "Create folders with mkdir. Organize however you like. "
+        "All paths are relative to your environment root."
+    )
+
 TOOLS = [
     {
         "type": "function",
         "name": "shell",
-        "description": (
-            "Run a shell command inside your environment folder. "
-            "You can use ls, cat, mkdir, mv, cp, touch, echo, tee, find, grep, head, tail, wc, etc. "
-            "You can also run Python scripts: 'python script.py' or 'python -c \"code\"'. "
-            "Use 'cat > file.txt << EOF' or 'echo ... > file.txt' to write files. "
-            "Create folders with mkdir. Organize however you like. "
-            "All paths are relative to your environment root."
-        ),
+        "description": _SHELL_DESCRIPTION,
         "parameters": {
             "type": "object",
             "properties": {

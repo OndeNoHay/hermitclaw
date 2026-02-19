@@ -1,6 +1,8 @@
-"""All configuration in one place."""
+"""All configurations in one place."""
 
 import os
+from urllib.parse import urlparse
+
 import yaml
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config.yaml")
@@ -68,6 +70,13 @@ def load_config() -> dict:
         config["environment_path"] = os.path.join(
             project_root, config["environment_path"]
         )
+
+    # Normalize base_url: Ollama and compatible servers expose /v1/chat/completions.
+    # If the user sets base_url to a bare host:port (no path), append /v1 automatically.
+    if config.get("base_url"):
+        parsed = urlparse(config["base_url"])
+        if parsed.path in ("", "/"):
+            config["base_url"] = config["base_url"].rstrip("/") + "/v1"
 
     # Validation
     if provider == "custom" and not config.get("base_url"):

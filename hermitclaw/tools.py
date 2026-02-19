@@ -183,11 +183,13 @@ def _rewrite_python_cmd(command: str, env_root: str) -> str | None:
 
 
 def _rewrite_script_cmd(command: str, env_root: str) -> str | None:
-    """Route ./script.py through sandbox so network etc. is blocked."""
+    """Route ./script.py (or .\\script.py on Windows) through sandbox so network etc. is blocked."""
     stripped = command.strip()
-    if stripped.startswith("./") and stripped.endswith(".py"):
-        script = stripped[2:].split()[0]  # ./foo.py or ./foo.py arg1
-        rest = stripped[2 + len(script) :].strip()  # any args after script
+    # Accept both Unix (./) and Windows (.\) relative script invocations
+    if stripped.startswith("./") or (sys.platform == "win32" and stripped.startswith(".\\")):
+        prefix_len = 2  # both "./" and ".\\" are 2 characters
+        script = stripped[prefix_len:].split()[0]  # foo.py or foo.py arg1
+        rest = stripped[prefix_len + len(script) :].strip()  # any args after script
         python = (
             _venv_python(env_root)
             if os.path.isfile(_venv_python(env_root))
@@ -245,24 +247,40 @@ def run_command(command: str, env_root: str) -> str:
         system_path = "/usr/local/bin:/usr/bin:/bin"
     venv_path = f"{vbin}{sep}{system_path}" if os.path.isdir(vbin) else system_path
 
+    run_env = {
+        "HOME": real_root,
+        "PATH": venv_path,
+        "TMPDIR": real_root,   # Unix
+        "TEMP": real_root,     # Windows
+        "TMP": real_root,      # Windows fallback
+        "LANG": "en_US.UTF-8",
+        "VIRTUAL_ENV": _venv_dir(env_root),
+    }
+
     try:
-        result = subprocess.run(
-            command,
-            shell=True,
-            cwd=real_root,
-            capture_output=True,
-            text=True,
-            timeout=60,  # longer timeout for pip installs
-            env={
-                "HOME": real_root,
-                "PATH": venv_path,
-                "TMPDIR": real_root,   # Unix
-                "TEMP": real_root,     # Windows
-                "TMP": real_root,      # Windows fallback
-                "LANG": "en_US.UTF-8",
-                "VIRTUAL_ENV": _venv_dir(env_root),
-            },
-        )
+        if sys.platform == "win32":
+            # cmd.exe doesn't have ls, cat, grep, etc. — use PowerShell instead.
+            # Rewritten Python/pip commands start with a quoted path; prefix & to invoke them.
+            if command.lstrip().startswith(("'", '"')):
+                command = "& " + command
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+                cwd=real_root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=run_env,
+            )
+        else:
+            result = subprocess.run(
+                command,
+                shell=True,
+                cwd=real_root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                env=run_env,
+            )
 
         output = ""
         if result.stdout:

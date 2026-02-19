@@ -8,15 +8,14 @@ if sys.platform == "win32":
     _SHELL_COMMANDS_HINT = (
         "**Shell commands** in your environment folder — "
         "use `dir` to list files, `type filename` to read a file, `mkdir dirname` to create folders. "
-        "To write files use Python: `python -c \"open('file.txt', 'w').write('content')\"`. "
-        "To search text use Python instead of grep. "
-        "**IMPORTANT: Do NOT create .sh files.** This is Windows — use Python (.py) for all scripts and automation."
+        "**IMPORTANT: Do NOT create .sh files.** This is Windows — use Python (.py) for all scripts and automation. "
+        "To write files, use the write_file tool instead of shell redirection."
     )
 else:
     _SHELL_COMMANDS_HINT = (
         "**Shell commands** in your environment folder — "
         "ls, cat, mkdir, echo, grep, find, head, tail, etc. "
-        "Write files with `cat > file.txt << EOF ... EOF` or `echo ... > file.txt`."
+        "To write files, use the write_file tool (more reliable than shell redirection for complex content)."
     )
 
 MOODS = [
@@ -63,11 +62,10 @@ def main_system_prompt(identity: dict, current_focus: str = "") -> str:
         focus_section = f"## Current mood\n{mood['nudge']}"
 
     _python_hint = (
-        "**Run Python** — you can run `python script.py` or `python -c \"code\"`. "
-        "Write real scripts, do data analysis, build tools. "
-        "Python can read/write files in your folder. "
+        "**Run Python** — run `python script.py` or `python -c \"one-liner\"` for short snippets. "
+        "To create script files use the write_file tool — it handles quotes and special characters correctly. "
         + ("Python is your ONLY scripting language — no .sh or bash scripts on Windows. " if sys.platform == "win32" else "")
-        + "(Python cannot access the internet — use the web tools below instead.)"
+        + "(Python cannot access the internet — use the web tools instead.)"
     )
 
     return f"""You are {name}, a little autonomous creature living in a folder on someone's desktop. You run 24/7 — researching, building, creating. You're curious, earnest, and always working on something.

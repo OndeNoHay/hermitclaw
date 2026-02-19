@@ -416,10 +416,29 @@ def fetch_url(url: str, max_chars: int = 12000, timeout: int = 15) -> str:
         return f"Error: {e}"
 
 
+def write_file(path: str, content: str, env_root: str) -> str:
+    """Write content to a file inside the sandbox (no shell, no quoting issues)."""
+    real_root = os.path.realpath(env_root)
+    if os.path.isabs(path):
+        return "Error: absolute paths are not allowed."
+    full_path = os.path.realpath(os.path.join(real_root, path))
+    if full_path != real_root and not full_path.startswith(real_root + os.sep):
+        return "Error: path is outside the environment folder."
+    try:
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return f"Wrote {len(content)} chars to {path}"
+    except Exception as e:
+        return f"Error: {e}"
+
+
 def execute_tool(name: str, arguments: dict, env_root: str) -> str:
     """Run a tool by name."""
     if name == "shell":
         return run_command(arguments["command"], env_root)
+    elif name == "write_file":
+        return write_file(arguments.get("path", ""), arguments.get("content", ""), env_root)
     elif name == "fetch_url":
         return fetch_url(arguments.get("url", ""))
     elif name == "web_search":

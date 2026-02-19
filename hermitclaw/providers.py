@@ -37,20 +37,18 @@ if sys.platform == "win32":
         "Run a shell command inside your environment folder. "
         "Use: dir (list files), type filename (read file), mkdir dirname (create folder), "
         "copy src dst (copy), move src dst (move), del filename (delete). "
-        "To write files use Python: python -c \"open('file.txt', 'w').write('your content')\". "
-        "To search text use Python: python -c \"[print(l) for l in open('f.txt') if 'term' in l]\". "
-        "You can also run Python scripts: python script.py or python -c \"code\". "
+        "Run Python: python script.py or python -c \"one-liner\". "
         "IMPORTANT: Do NOT create .sh files — this is Windows. Use .py Python scripts for all automation. "
+        "To write files with complex content (quotes, newlines), use the write_file tool instead. "
         "All paths are relative to your environment root."
     )
 else:
     _SHELL_DESCRIPTION = (
         "Run a shell command inside your environment folder. "
         "You can use ls, cat, mkdir, mv, cp, touch, echo, tee, find, grep, head, tail, wc, etc. "
-        "You can also run Python scripts: 'python script.py' or 'python -c \"code\"'. "
-        "Use 'cat > file.txt << EOF' or 'echo ... > file.txt' to write files. "
-        "Create folders with mkdir. Organize however you like. "
-        "All paths are relative to your environment root."
+        "You can also run Python scripts: python script.py or python -c \"one-liner\". "
+        "To write files with complex content (quotes, newlines, special chars), use the write_file tool. "
+        "Create folders with mkdir. All paths are relative to your environment root."
     )
 
 TOOLS = [
@@ -64,6 +62,30 @@ TOOLS = [
                 "command": {"type": "string", "description": "The shell command to run"}
             },
             "required": ["command"],
+        },
+    },
+    {
+        "type": "function",
+        "name": "write_file",
+        "description": (
+            "Write content to a file in your environment folder. "
+            "Use this to create or overwrite any file — it handles quotes, newlines, and special "
+            "characters correctly, unlike python -c one-liners. "
+            "Prefer this over shell redirection for writing Python scripts, markdown, or any multi-line content."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Relative file path (e.g. 'notes/ideas.md', 'projects/tool.py')",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "The exact content to write. Newlines and quotes are handled correctly.",
+                },
+            },
+            "required": ["path", "content"],
         },
     },
     {

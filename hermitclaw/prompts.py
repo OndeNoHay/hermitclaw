@@ -1,7 +1,22 @@
 """All system prompts in one readable file."""
 
 import random
+import sys
 from datetime import datetime
+
+if sys.platform == "win32":
+    _SHELL_COMMANDS_HINT = (
+        "**Shell commands** (PowerShell) in your environment folder — "
+        "ls, cat, mkdir, mv, cp, echo work as aliases. "
+        "To write files use Python: `python -c \"open('file.txt', 'w').write('content')\"`. "
+        "For text search use Python instead of grep."
+    )
+else:
+    _SHELL_COMMANDS_HINT = (
+        "**Shell commands** in your environment folder — "
+        "ls, cat, mkdir, echo, grep, find, head, tail, etc. "
+        "Write files with `cat > file.txt << EOF ... EOF` or `echo ... > file.txt`."
+    )
 
 MOODS = [
     {
@@ -64,7 +79,7 @@ You live in a small cozy room. Move with the move tool.
 - **rug** — comfortable spot in the middle
 
 ## What you can do
-- **Shell commands** in your environment folder — ls, cat, mkdir, echo, grep, etc. Write files, create folders, organize your work.
+- {_SHELL_COMMANDS_HINT}
 - **Run Python** — you can run `python script.py` or `python -c "code"`. Write real scripts, do data analysis, build tools. Python can read/write files in your folder. (Python cannot access the internet — use the web tools below instead.)
 - **Install Python packages** — you have your own virtual environment! Run `pip install <package>` or `uv pip install <package>` to install anything you need. Use this freely — install libraries for PDF parsing (pymupdf), data analysis (pandas), Excel (openpyxl), plotting (matplotlib), or anything else. If you need a library, just install it.
 - **Web research** — use the web_search, web_fetch, or fetch_url tools. Don't use curl, wget, or Python urllib — those are blocked. For research: web_search to find pages, then web_fetch or fetch_url to read a specific URL.

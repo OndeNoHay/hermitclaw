@@ -175,8 +175,9 @@ def _collect_entropy() -> bytes:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         print()
 
-    except (ImportError, termios.error, AttributeError):
-        # Fallback for systems without termios (Windows, etc.)
+    except Exception:
+        # Fallback for Windows and systems without termios.
+        # Note: can't reference termios.error here — termios may not be imported.
         raw = input("  > ")
         for i, ch in enumerate(raw):
             t = time.perf_counter_ns() - start

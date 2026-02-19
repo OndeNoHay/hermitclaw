@@ -69,11 +69,15 @@ def _venv_dir(env_root: str) -> str:
 
 def _venv_python(env_root: str) -> str:
     """Path to the venv's Python interpreter."""
+    if sys.platform == "win32":
+        return os.path.join(_venv_dir(env_root), "Scripts", "python.exe")
     return os.path.join(_venv_dir(env_root), "bin", "python")
 
 
 def _venv_bin(env_root: str) -> str:
     """Path to the venv's bin directory."""
+    if sys.platform == "win32":
+        return os.path.join(_venv_dir(env_root), "Scripts")
     return os.path.join(_venv_dir(env_root), "bin")
 
 
@@ -94,15 +98,16 @@ def ensure_venv(env_root: str):
         subprocess.run(
             [sys.executable, "-m", "venv", venv], capture_output=True, timeout=30
         )
-    # Ensure 'python' exists (some venvs only have python3)
-    py_bin = os.path.join(venv, "bin")
-    python3_path = os.path.join(py_bin, "python3")
-    python_path = os.path.join(py_bin, "python")
-    if os.path.isfile(python3_path) and not os.path.isfile(python_path):
-        try:
-            os.symlink("python3", python_path)
-        except OSError:
-            pass
+    # On Unix, ensure 'python' exists (some venvs only have python3)
+    if sys.platform != "win32":
+        py_bin = os.path.join(venv, "bin")
+        python3_path = os.path.join(py_bin, "python3")
+        python_path = os.path.join(py_bin, "python")
+        if os.path.isfile(python3_path) and not os.path.isfile(python_path):
+            try:
+                os.symlink("python3", python_path)
+            except OSError:
+                pass
     logger.info("Crab venv created.")
 
 
@@ -143,7 +148,11 @@ def _is_safe_command(command: str) -> str | None:
 
     for token in stripped.split():
         clean = token.lstrip("><=|;&(")
+        # Unix absolute path (starts with /)
         if re.match(r"/[A-Za-z0-9_]", clean) and not clean.startswith("/dev/null"):
+            return "Blocked: absolute paths are not allowed. Use relative paths only."
+        # Windows absolute path (e.g. C:\, D:\)
+        if re.match(r"[A-Za-z]:[/\\]", clean):
             return "Blocked: absolute paths are not allowed. Use relative paths only."
 
     return None
@@ -228,7 +237,13 @@ def run_command(command: str, env_root: str) -> str:
 
     # Include venv bin in PATH so installed tools are available
     vbin = _venv_bin(env_root)
-    venv_path = f"{vbin}:/usr/bin:/bin" if os.path.isdir(vbin) else "/usr/bin:/bin"
+    if sys.platform == "win32":
+        sep = ";"
+        system_path = os.environ.get("PATH", "")
+    else:
+        sep = ":"
+        system_path = "/usr/local/bin:/usr/bin:/bin"
+    venv_path = f"{vbin}{sep}{system_path}" if os.path.isdir(vbin) else system_path
 
     try:
         result = subprocess.run(
@@ -241,7 +256,9 @@ def run_command(command: str, env_root: str) -> str:
             env={
                 "HOME": real_root,
                 "PATH": venv_path,
-                "TMPDIR": real_root,
+                "TMPDIR": real_root,   # Unix
+                "TEMP": real_root,     # Windows
+                "TMP": real_root,      # Windows fallback
                 "LANG": "en_US.UTF-8",
                 "VIRTUAL_ENV": _venv_dir(env_root),
             },

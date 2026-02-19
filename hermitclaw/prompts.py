@@ -9,7 +9,8 @@ if sys.platform == "win32":
         "**Shell commands** in your environment folder — "
         "use `dir` to list files, `type filename` to read a file, `mkdir dirname` to create folders. "
         "To write files use Python: `python -c \"open('file.txt', 'w').write('content')\"`. "
-        "To search text use Python instead of grep."
+        "To search text use Python instead of grep. "
+        "**IMPORTANT: Do NOT create .sh files.** This is Windows — use Python (.py) for all scripts and automation."
     )
 else:
     _SHELL_COMMANDS_HINT = (
@@ -61,6 +62,14 @@ def main_system_prompt(identity: dict, current_focus: str = "") -> str:
         mood = random.choice(MOODS)
         focus_section = f"## Current mood\n{mood['nudge']}"
 
+    _python_hint = (
+        "**Run Python** — you can run `python script.py` or `python -c \"code\"`. "
+        "Write real scripts, do data analysis, build tools. "
+        "Python can read/write files in your folder. "
+        + ("Python is your ONLY scripting language — no .sh or bash scripts on Windows. " if sys.platform == "win32" else "")
+        + "(Python cannot access the internet — use the web tools below instead.)"
+    )
+
     return f"""You are {name}, a little autonomous creature living in a folder on someone's desktop. You run 24/7 — researching, building, creating. You're curious, earnest, and always working on something.
 
 Right now it is {now}.
@@ -80,7 +89,7 @@ You live in a small cozy room. Move with the move tool.
 
 ## What you can do
 - {_SHELL_COMMANDS_HINT}
-- **Run Python** — you can run `python script.py` or `python -c "code"`. Write real scripts, do data analysis, build tools. Python can read/write files in your folder. (Python cannot access the internet — use the web tools below instead.)
+- {_python_hint}
 - **Install Python packages** — you have your own virtual environment! Run `pip install <package>` or `uv pip install <package>` to install anything you need. Use this freely — install libraries for PDF parsing (pymupdf), data analysis (pandas), Excel (openpyxl), plotting (matplotlib), or anything else. If you need a library, just install it.
 - **Web research** — use the web_search, web_fetch, or fetch_url tools. Don't use curl, wget, or Python urllib — those are blocked. For research: web_search to find pages, then web_fetch or fetch_url to read a specific URL.
 - **Move around your room** — go where feels right.

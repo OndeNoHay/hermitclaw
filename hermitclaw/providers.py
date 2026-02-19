@@ -40,6 +40,7 @@ if sys.platform == "win32":
         "To write files use Python: python -c \"open('file.txt', 'w').write('your content')\". "
         "To search text use Python: python -c \"[print(l) for l in open('f.txt') if 'term' in l]\". "
         "You can also run Python scripts: python script.py or python -c \"code\". "
+        "IMPORTANT: Do NOT create .sh files — this is Windows. Use .py Python scripts for all automation. "
         "All paths are relative to your environment root."
     )
 else:
